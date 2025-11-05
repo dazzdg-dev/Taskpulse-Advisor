@@ -1,342 +1,128 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
-<title>TaskPulse Advisor</title>
-<link rel="manifest" href="manifest.webmanifest">
-<meta name="theme-color" content="#0b0d12">
-<link rel="apple-touch-icon" sizes="180x180" href="assets/icons/icon-192.png">
-<style>
-:root{--bg:#0b0d12;--ink:#ecf2ff;--mut:#aab3c5;--pri:#7c5cff;--good:#29d78a;--bad:#ff6b6b;--card:#141a2a;--line:#24304e}
-*{box-sizing:border-box} html,body{height:100%}
-body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,system-ui,Segoe UI,Roboto,Arial,sans-serif}
-.wrap{max-width:1100px;margin:0 auto;padding:12px 12px 140px}
-header{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:6px 0 10px;flex-wrap:wrap}
-.logo{display:flex;align-items:center;gap:10px}
-.logo-mark{width:40px;height:40px;border-radius:12px;overflow:hidden;border:1px solid #263155;display:grid;place-items:center;background:#0e1426;color:#7c9fff;font-weight:800}
-h1{margin:0;font-size:22px;font-weight:800}.mut{color:var(--mut)}
-.btn{padding:12px 14px;border-radius:12px;border:1px solid #2b3555;background:#1b2340;color:#fff;cursor:pointer}
-.btn.pri{background:#5e41ff}.btn.good{background:#1dbb79}.btn.bad{background:#b93e3e}
-.btn.block{display:block;width:100%}.btn[disabled]{opacity:.5;pointer-events:none}
-.input,select{width:100%;padding:12px;border-radius:12px;background:#0f1526;border:1px solid #27325a;color:#e8eeff}
-.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;margin:0 0 12px}
-.stack{display:flex;flex-direction:column;gap:10px}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.pill{padding:6px 8px;border-radius:999px;border:1px solid #313d6e;background:#11172a;color:#cbd6ff;font-size:12px}
-.list .rowi{display:grid;grid-template-columns:100px 1.5fr 1fr 90px 110px 110px;gap:8px;align-items:center;padding:10px 0;border-bottom:1px dashed #273155}
-.amt{font-weight:700}
-.tabs{position:sticky;top:0;z-index:5;display:flex;gap:8px;overflow:auto;padding:8px 2px 12px;background:linear-gradient(180deg,#0b0d12 70%,rgba(11,13,18,0))}
-.tab{padding:12px 16px;border-radius:12px;border:1px solid #2b3555;background:#131a2a;color:#d9e1ff;cursor:pointer;flex:0 0 auto}
-.tab[aria-selected="true"]{background:linear-gradient(180deg,#1c2540,#151c2e);border-color:#3a4581;color:#fff}
-@media(max-width:820px){
-  header .stack{width:100%;gap:8px}
-  header .stack .btn{flex:1}
-  .grid2{grid-template-columns:1fr}
-  .tabs{position:fixed;bottom:0;top:auto;background:#0c0f19;border-top:1px solid #20263a;justify-content:space-between;padding:8px 10px}
-  .tab{flex:1;text-align:center}
-  .list .rowi{grid-template-columns:70px 1fr 1fr 80px 90px}
-  .btn.block-sm{display:block;width:100%}
-}
-.hidden{display:none}
-pre{font-family:ui-monospace, Menlo, Consolas, monospace}
-</style>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-<script>pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";</script>
-</head>
-<body>
-<div class="wrap">
-  <header>
-    <div class="logo">
-      <div class="logo-mark" aria-hidden="true">TP</div>
-      <div><h1>TaskPulse <span style="opacity:.9">Advisor</span></h1>
-        <div class="mut" style="font-size:12px">Financial advisor • planner • tracker (PDF-first, offline-first)</div>
-      </div>
-    </div>
-    <div class="stack" style="flex-direction:row;flex-wrap:wrap;gap:8px">
-      <button class="btn" id="btnExport">Export</button>
-      <label class="btn" for="jsonIn">Import JSON</label>
-      <input id="jsonIn" type="file" accept="application/json" class="hidden">
-      <label class="btn pri" for="pdfIn">Import PDF</label>
-      <input id="pdfIn" type="file" accept="application/pdf" class="hidden">
-    </div>
-  </header>
-
-  <nav class="tabs" role="tablist">
-    <button class="tab" data-tab="home" aria-selected="true">Home</button>
-    <button class="tab" data-tab="statements">Statements</button>
-    <button class="tab" data-tab="budgets">Budgets</button>
-    <button class="tab" data-tab="goals">Goals</button>
-    <button class="tab" data-tab="reports">Reports</button>
-    <button class="tab" data-tab="settings">Settings</button>
-  </nav>
-
-  <section id="tab-home">
-    <div class="card"><div class="mut">Go to Statements → import your PDF. After parsing, press “Add to ledger”.</div></div>
-  </section>
-
-  <section id="tab-statements" class="hidden">
-    <div class="grid2">
-      <div class="card">
-        <h3>Import bank statement (PDF)</h3>
-        <div class="stack">
-          <div class="mut" style="font-size:12px">On-device parsing. Nothing leaves your phone/laptop.</div>
-          <label class="btn pri block-sm" for="pdfChoose">Choose PDF</label>
-          <input id="pdfChoose" type="file" accept="application/pdf" class="hidden">
-          <div id="importSummary" class="mut" style="font-size:12px">No transactions found.</div>
-
-          <label style="display:flex;gap:8px;align-items:center">
-            <input type="checkbox" id="debugToggle">
-            <span class="mut" style="font-size:12px">Debug: show extracted text</span>
-          </label>
-          <pre id="debugDump" class="hidden" style="max-height:220px;overflow:auto;background:#0f1424;border:1px solid #253155;border-radius:10px;padding:10px;white-space:pre-wrap"></pre>
-
-          <div id="commitBar" class="stack hidden" style="gap:8px">
-            <button class="btn good block-sm" id="commitImport" disabled>Add to ledger</button>
-            <button class="btn bad block-sm" id="discardImport" disabled>Discard</button>
-          </div>
-        </div>
-      </div>
-
-      <div class="card">
-        <h3>Merchant rename rules</h3>
-        <div id="renameList" class="stack"></div>
-        <form id="renameForm" class="grid2">
-          <input class="input" id="rnMatch" placeholder="Match (e.g., shoprite holdings)" required>
-          <input class="input" id="rnTo" placeholder="Rename to (e.g., Shoprite)" required>
-          <select class="input" id="rnMode">
-            <option value="contains">contains</option>
-            <option value="exact">exact</option>
-            <option value="regex">regex</option>
-          </select>
-          <button class="btn">Add rename</button>
-        </form>
-        <div class="mut" style="font-size:12px">Renames run before categorisation.</div>
-      </div>
-    </div>
-
-    <div class="card"><h3>Review & approve (first 30 rows)</h3><div id="reviewList" class="list"></div></div>
-  </section>
-
-  <section id="tab-budgets" class="hidden"><div class="card"><h3>Budgets</h3></div></section>
-  <section id="tab-goals" class="hidden"><div class="card"><h3>Goals</h3></div></section>
-  <section id="tab-reports" class="hidden"><div class="card"><h3>Reports</h3></div></section>
-  <section id="tab-settings" class="hidden"><div class="card"><h3>Settings</h3><div class="mut" style="font-size:12px">Overdraft guard: R500.</div></div></section>
-
-  <footer class="mut" style="text-align:center;margin:20px 0 8px;font-size:12px">Powered by Daryl G</footer>
-</div>
-
-<template id="txRowTpl">
-  <div class="rowi">
-    <div class="mut dt"></div>
-    <div class="desc"></div>
-    <div class="pill cat"></div>
-    <div class="pill type"></div>
-    <div class="amt"></div>
-    <div style="display:flex;gap:8px"><button class="btn">Edit</button><button class="btn bad">Delete</button></div>
-  </div>
-</template>
-
 <script>
-const $=(s,p=document)=>p.querySelector(s), $$=(s,p=document)=>Array.from(p.querySelectorAll(s));
-const fmt=new Intl.NumberFormat('en-ZA',{style:'currency',currency:'ZAR'});
-const state={tx:[],renames:[],pending:[]};
-function save(){localStorage.setItem('tp-advisor',JSON.stringify(state));}
-function load(){try{Object.assign(state,JSON.parse(localStorage.getItem('tp-advisor')||'{}')||{});}catch{}}
-load();
-
-/* tabs */
-$$('.tab').forEach(b=>b.addEventListener('click',()=>{
-  $$('.tab').forEach(x=>x.setAttribute('aria-selected','false')); b.setAttribute('aria-selected','true');
-  ['home','statements','budgets','goals','reports','settings'].forEach(id=>$('#tab-'+id).classList.add('hidden'));
-  $('#tab-'+b.dataset.tab).classList.remove('hidden');
-}));
-
-/* export/import JSON */
-$('#btnExport').addEventListener('click',()=>{
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(new Blob([JSON.stringify(state,null,2)],{type:'application/json'}));
-  a.download='taskpulse-advisor.json'; a.click();
-});
-document.addEventListener('change', async e=>{
-  if(e.target && e.target.id==='jsonIn'){
-    const f=(e.target.files && e.target.files[0])||null; if(!f) return;
-    const t=await f.text(); try{Object.assign(state,JSON.parse(t)); save(); alert('Imported JSON.');}catch{alert('Bad JSON');}
-  }
-});
-
-/* renames */
-function normaliseMerchant(s){return (s||'').toLowerCase().replace(/\s+/g,' ').replace(/\d+/g,'').replace(/[^a-z\s:&]/g,'').trim();}
-function applyRenameRaw(d){
-  let o=d||''; for(const r of (state.renames||[])){ try{
-    if(r.mode==='exact' && o.toLowerCase().trim()===(r.match||'').toLowerCase().trim()) o=r.to;
-    else if(r.mode==='contains' && o.toLowerCase().includes(String(r.match||'').toLowerCase())) o=r.to;
-    else if(r.mode==='regex'){ const re=new RegExp(String(r.match||''),'i'); if(re.test(o)) o=o.replace(re,r.to); }
-  }catch{} } return o;
-}
-function autoCategory(t){
-  const s=(t.merchant||'')+' '+(t.raw||'');
-  const rules=[{re:/bp|garage|fuel|motors/i,cat:'Transport:Fuel'},{re:/youtube|spotify|netflix|openai|google/i,cat:'Subscriptions'},{re:/service fee|monthly fee|vat|int on debit/i,cat:'Fees'}];
-  for(const r of rules) if(r.re.test(s)) return r.cat; return 'Uncategorised';
-}
-function renderRenames(){
-  const host=$('#renameList'); host.innerHTML='';
-  (state.renames||[]).forEach((r,i)=>{
-    const row=document.createElement('div'); row.style.display='flex'; row.style.gap='8px';
-    row.innerHTML=`<span class="pill">${r.mode}: "${r.match}" → <b>${r.to}</b></span><button class="btn" data-del="${i}">Delete</button>`;
-    row.querySelector('[data-del]').onclick=()=>{state.renames.splice(i,1); save(); renderRenames();};
-    host.appendChild(row);
-  });
-}
-renderRenames();
-document.addEventListener('submit',e=>{
-  if(e.target && e.target.id==='renameForm'){ e.preventDefault();
-    const match=$('#rnMatch').value.trim(), to=$('#rnTo').value.trim(), mode=$('#rnMode').value;
-    if(!match||!to) return; (state.renames=state.renames||[]).push({match,to,mode}); e.target.reset(); save(); renderRenames();
-  }
-});
-
-/* ---- PDF import: wire both inputs ---- */
-let _previewRows=[];
-async function handlePdfFile(file){
-  if(!file) return;
-  const buf = await file.arrayBuffer();
-  try{
-    const pdf = await pdfjsLib.getDocument({data:buf}).promise;
-    let all = '';
-    for(let i=1;i<=pdf.numPages;i++){
-      const p = await pdf.getPage(i);
-      const c = await p.getTextContent();
-      all += '\n' + c.items.map(it=>it.str).join('\n');
-    }
-    // Debug dump
-    const dbg = $('#debugToggle') && $('#debugToggle').checked;
-    if (dbg){ $('#debugDump').classList.remove('hidden'); $('#debugDump').textContent = all.slice(0,20000) || '(No text extracted)'; }
-    else { $('#debugDump').classList.add('hidden'); $('#debugDump').textContent=''; }
-
-    const parsed = parseBankPdf(all);
-    _previewRows = parsed;
-    const host=$('#reviewList'); host.innerHTML='';
-    parsed.slice(0,30).forEach(t=> host.appendChild(txRow(t)));
-
-    const ok = parsed.length>0;
-    $('#importSummary').textContent = ok ? `Ready: ${parsed.length} rows.` : (all.trim()? 'No transactions matched this layout.':'No text in PDF (scanned image).');
-    $('#commitBar').classList.toggle('hidden', !ok);
-    $('#commitImport').disabled = !ok; $('#discardImport').disabled = !ok;
-  }catch(err){ console.error(err); alert('PDF parsing failed.'); }
-}
-document.addEventListener('change', async e=>{
-  if(e.target && (e.target.id==='pdfChoose' || e.target.id==='pdfIn')){
-    const f=(e.target.files && e.target.files[0])||null; await handlePdfFile(f);
-  }
-});
-$('#commitImport').addEventListener('click',()=>{ if(!_previewRows.length) return;
-  state.tx=state.tx.concat(_previewRows); _previewRows=[]; $('#reviewList').innerHTML='';
-  $('#commitBar').classList.add('hidden'); $('#commitImport').disabled=true; $('#discardImport').disabled=true;
-  $('#importSummary').textContent='Imported.'; save();
-});
-$('#discardImport').addEventListener('click',()=>{ _previewRows=[]; $('#reviewList').innerHTML=''; $('#commitBar').classList.add('hidden'); $('#commitImport').disabled=true; $('#discardImport').disabled=true; $('#importSummary').textContent='Discarded.'; });
-
-/* render a row */
-function txRow(t){
-  const tpl=document.querySelector('#txRowTpl').content.cloneNode(true), r=tpl.querySelector('.rowi');
-  r.querySelector('.dt').textContent=t.date;
-  r.querySelector('.desc').textContent=t.desc||'(no description)';
-  r.querySelector('.cat').textContent=t.category||'—';
-  r.querySelector('.type').textContent=t.type;
-  const a=r.querySelector('.amt'); a.textContent=(t.type==='expense'?'-':'+')+fmt.format(Math.abs(+t.amount));
-  a.style.color=t.type==='expense'?'var(--bad)':'var(--good)'; return r;
-}
-
-/* ==== FNB-aware multi-line parser ==== */
 function parseBankPdf(text){
-  const lines = text.split(/\n+/).map(s=>s.replace(/\u00A0/g,' ').trim()).filter(Boolean);
+  const lines = text.split(/\n+/).map(s => s.replace(/\u00A0/g,' ').trim()).filter(Boolean);
 
-  // extract a year from headers (Statement Date / Period)
+  // 1) Infer a year from headers (Statement Date / Period / Closing Balance lines)
   let stmtYear = null;
-  for(const L of lines){
+  for (const L of lines) {
     const m = L.match(/\b(20\d{2})\b/);
-    if(m){ stmtYear = m[1]; break; }
+    if (m) { stmtYear = m[1]; break; }
   }
+
+  // 2) Tokens & helpers
   const mon = {jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
-  const monRe = "(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)";
-  const dayMon = new RegExp("^\\d{1,2}\\s+"+monRe+"$", "i"); // e.g., "01 Oct"
+  const dayMon = new RegExp("^\\d{1,2}\\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)$", "i");
   const fullDate = /^(?:\d{1,2}\s+[A-Za-z]{3}\s+\d{4}|\d{1,2}\/\d{1,2}\/\d{4}|\d{4}-\d{2}-\d{2})$/;
 
-  // helpers
   const toISO = (d,m,y) => `${y}-${String(mon[m.toLowerCase()]).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-  const numLike = s => /^(?:R\s*)?\(?-?\d{1,3}(?:[ ,]\d{3})*|\d+(?:[.,]\d{2})\)?$/.test(s) || /^(?:\d{1,3}(?:[ ,]\d{3})*|\d+)[.,]\d{2}$/.test(s);
-  const amountLike = s => /^(?:R\s*)?\(?-?\d{1,3}(?:[ ,]\d{3})*|\d+(?:[.,]\d{2})\)?(?:\s*(?:CR|DR))?$/i.test(s);
-  const cleanNum = s => {
+
+  const isAmountLike = s => /^(?:R\s*)?\(?-?\d{1,3}(?:[ ,]\d{3})*|\d+)(?:[.,]\d{2})\)?(?:\s*(?:CR|DR))?$/i.test(s);
+  const isNumericMoney = s => /^(?:R\s*)?\(?-?\d{1,3}(?:[ ,]\d{3})*|\d+)(?:[.,]\d{2})\)?$/i.test(s);
+  const cleanMoney = s => {
     if(!s) return NaN;
     const neg = /^\(.*\)$/.test(s) || /\bDR\b/i.test(s) || /-\d/.test(s);
     const cr  = /\bCR\b/i.test(s);
     const v = parseFloat(String(s).replace(/[R\s,]/g,'').replace(/(CR|DR)/i,''));
-    if(isNaN(v)) return NaN;
-    if(cr) return Math.abs(v);
+    if (isNaN(v)) return NaN;
+    if (cr) return Math.abs(v);
     return neg ? -Math.abs(v) : Math.abs(v);
   };
 
-  // skip obvious headers/labels
-  const junk = new Set(["date","description","amount","balance","accrued","bank","charges","transactions in rand (zar)","page","statement balances","opening balance","closing balance","service fees","cash deposit fees","cash handling fees","other fees","credit rate**","debit rate","overdraft limit","statement date","statement period"]);
-  function isHeader(s){ const t=s.toLowerCase(); for(const k of junk){ if(t.startsWith(k)) return true; } return false; }
+  // Headers/junk we ignore in description
+  const junkStart = /^(date|description|amount|balance|accrued|bank|charges|transactions in rand|page|statement|opening balance|closing balance|service fees|credit rate|debit rate|overdraft limit)$/i;
+  const looksRef  = /(\d{3,}\*\d{3,})|([A-Za-z]{2}\d{2}\/\d{2})/; // e.g., 412752*3702 or 07/94
 
-  // walk lines, build blocks starting at "dd Mon" or full date
+  // 3) Build blocks: start when we see a date token (either "dd Mon" or a full date)
   const blocks = [];
   let cur = null;
-  for(let i=0;i<lines.length;i++){
-    const L = lines[i];
-    if(isHeader(L)) continue;
 
-    if(fullDate.test(L)){
-      cur && blocks.push(cur); cur = {dateISO:L, parts:[], sawCR:false};
-      continue;
-    }
+  function startBlockByDayMon(L){
+    const d = L.split(/\s+/)[0], mo = L.split(/\s+/)[1];
+    const y = stmtYear || new Date().getFullYear();
+    return { dateISO: toISO(d, mo, y), parts: [], flags: { cr:false, dr:false } };
+  }
+
+  for (let i=0;i<lines.length;i++){
+    const L = lines[i];
+
+    if (fullDate.test(L)) { if (cur) blocks.push(cur); cur = { dateISO: L, parts: [], flags:{cr:false,dr:false} }; continue; }
+
     const m = L.match(dayMon);
-    if(m){
-      // need a year; fallback to header year, else current year
-      const d = L.split(/\s+/)[0]; const mo = m[1];
-      const y = stmtYear || new Date().getFullYear();
-      cur && blocks.push(cur);
-      cur = {dateISO: toISO(d, mo, y), parts:[], sawCR:false};
-      continue;
-    }
-    if(!cur) continue;
-    if(/\bCR\b/i.test(L)) cur.sawCR = true;
+    if (m) { if (cur) blocks.push(cur); cur = startBlockByDayMon(L); continue; }
+
+    if (!cur) continue; // ignore preamble
+
+    if (/^\s*CR\s*$/i.test(L)) cur.flags.cr = true;
+    if (/^\s*DR\s*$/i.test(L)) cur.flags.dr = true;
+
     cur.parts.push(L);
   }
-  cur && blocks.push(cur);
+  if (cur) blocks.push(cur);
 
-  // parse each block: gather description + first amount and balance
-  const incomeHint=/transfer from|salary|deposit|refund|reversal/i;
-  const out=[];
-  for(const b of blocks){
-    let descParts=[], amt=null, bal=null, signCR=b.sawCR;
-    for(let j=0;j<b.parts.length;j++){
-      const t=b.parts[j];
-      if(amountLike(t) && amt===null){ amt = cleanNum(t); continue; }
-      if(numLike(t) && bal===null){ bal = cleanNum(t); continue; }
-      if(!isHeader(t)) descParts.push(t);
+  // 4) Parse each block
+  const incomeHint = /transfer from|salary|deposit|refund|reversal/i;
+  const out = [];
+
+  for (const b of blocks){
+    // Scan parts, identify numeric tokens and their surrounding tokens
+    const tokens = b.parts.filter(x => x && !junkStart.test(x));
+    const numbers = [];
+    for (let i=0;i<tokens.length;i++){
+      if (isNumericMoney(tokens[i])) {
+        const next1 = (tokens[i+1]||'').trim();
+        const next2 = (tokens[i+2]||'').trim();
+        const hasCrDr = /^\s*(CR|DR)\s*$/i.test(next1) || /^\s*(CR|DR)\s*$/i.test(next2);
+        numbers.push({idx:i, raw:tokens[i], val:cleanMoney(tokens[i]), hasCrDr});
+      }
     }
-    // Compact noisy refs into one line
+
+    // Choose balance: last number that is followed by CR/DR; otherwise the last number.
+    let balIdx = -1;
+    for (let k=numbers.length-1;k>=0;k--){
+      if (numbers[k].hasCrDr) { balIdx = k; break; }
+    }
+    if (balIdx === -1 && numbers.length) balIdx = numbers.length-1;
+
+    // Amount is the numeric immediately before balance
+    let amtIdx = (balIdx>0) ? balIdx-1 : -1;
+    if (amtIdx === -1 && numbers.length) amtIdx = 0;
+
+    const amountVal = (amtIdx>=0 && !isNaN(numbers[amtIdx].val)) ? Math.abs(numbers[amtIdx].val) : NaN;
+    if (isNaN(amountVal) || amountVal===0) continue;
+
+    // Build description from everything that isn't an amount/balance/CR/DR token
+    const skipIdx = new Set([numbers[amtIdx]?.idx, numbers[balIdx]?.idx, numbers[balIdx]?.idx+1, numbers[balIdx]?.idx+2]);
+    const descParts = tokens.filter((t,ix)=>{
+      if (skipIdx.has(ix)) return false;
+      if (/^\s*(CR|DR)\s*$/i.test(t)) return false;
+      if (looksRef.test(t)) return false;
+      return true;
+    });
     let desc = descParts.join(' ').replace(/\s{2,}/g,' ').trim();
-    desc = desc.replace(/\b\d{3,}\*\d{3,}\b/g,'').replace(/\s{2,}/g,' ').trim();
-    if(!desc) desc='(no description)';
+    if (!desc) desc = '(no description)';
 
-    if(amt===null || isNaN(amt)) continue; // no value found
-
-    // decide type
+    // Decide type
     let type = 'expense';
-    if(signCR || incomeHint.test(desc) || amt>0 && /cr/i.test(b.parts.join(' '))) type='income';
-    if(!signCR && !incomeHint.test(desc) && amt<0) type='expense';
+    if (b.flags.cr || incomeHint.test(desc)) type = 'income';
+    // If statement shows DR explicitly near amount line
+    if (b.flags.dr && !incomeHint.test(desc)) type = 'expense';
 
-    const amount = Math.abs(amt);
-    const renamed=applyRenameRaw(desc);
-    const merch=normaliseMerchant(renamed);
+    const renamed = applyRenameRaw(desc);
+    const merch = normaliseMerchant(renamed);
 
-    out.push({date:b.dateISO,type,desc:renamed,merchant:renamed,normMerchant:merch,category:autoCategory({merchant:merch,raw:desc}),amount,account:'Bank',src:'pdf'});
+    out.push({
+      date: b.dateISO,
+      type,
+      desc: renamed,
+      merchant: renamed,
+      normMerchant: merch,
+      category: autoCategory({merchant: merch, raw: desc}),
+      amount: amountVal,
+      account: 'Bank',
+      src: 'pdf'
+    });
   }
+
   return out;
 }
 </script>
-</body>
-</html>
